@@ -11,36 +11,6 @@ from torch.utils.data import dataset
 #TODO Custom Transformer Encoding layer
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
 
-
-class LSHSelfAttention(nn.Module):
-    # TODO: implement this
-    
-    pass
-
-class LSHEncoderLayer(nn.Module):
-    def __init__(d_model: int, nhead: int, d_forward: int, bucket_size: int, num_hashes: int, dropout: float=0.5):
-        super().__init__()
-        self.lsh_attention = LSHSelfAttention(d_model, nhead, dropout, bucket_size=5, num_hashes=5)
- 
-        self.feed_forward = nn.Sequential(
-            nn.Linear(d_model, d_forward),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(d_forward, d_model)
-        ) 
-
-    def forward(self, src, src_mask=None):
-        
-        # apply the LSH Attention
-        src = self.lsh_attention(src, mask=src_mask)
-        
-        # apply feedforward
-        src = self.feed_forward(src)
-        
-        # TODO: other norms and residual conns?
-        
-        return src
-      
 # Use Pretrained word embeddings instead??
 class PositionalEncoding(nn.Module):
     def __init__(self, d_model: int, dropout: float=0.1, max_len: int=5000):
@@ -60,15 +30,83 @@ class PositionalEncoding(nn.Module):
         x = x + self.pe[:x.size(0)]
         return self.dropoput(x)
         
+class LSHSelfAttention(nn.Module):
+    # TODO: implement this
+    def __init__(self, d_model: int, num_heads: int, dropout: int, bucket_size: int=5, num_hashes: int=5):
+        super().__init__()
+        self.d_model = d_model
+        self.num_heads = num_heads
+        self.dropout = dropout
+        self.bucket_size = bucket_size 
+        self.num_hashes = num_hashes
+        self.d_k = d_model // num_heads
+        
+        self.query_projection = nn.Linear(d_model, self.d_k * num_heads)
+        self.key_projection = nn.Linear(d_model, self.d_k * num_heads)
+        self.value_projection = nn.Linear(d_model, self.d_k * num_heads)
+        
+        #output
+        self.out_projection = nn.Linear(self.d_k * num_heads, d_model)
+
+        
+        self.attention_dropout = nn.Dropout(dropout)
+       
+    def forward(self, query, key, value, mask=None):
+        # Step 1: Apply query/key/value projections
+        query = self.query_projection(query)
+        key = self.key_projection(key)
+        value = self.value_projection(value)
+
+        # Step 2: Hash queries and keys into buckets
+        # Implement the hashing function here
+        # ...
+
+        # Step 3: Perform attention within each bucket
+        # You might need to sort or reorder queries/keys/values based on the hash
+        # ...
+
+        # Step 4: Apply attention to the values
+        # This will include calculating attention scores, applying dropout, and combining the results
+        # ...
+
+        # Step 5: Concatenate results from different heads (if multiple rounds of hashing)
+        # ...
+
+        # Step 6: Apply final output projection
+        output = self.out_projection(attention_output)
+
+        return output
+         
+        
+
+class LSHEncoderLayer(nn.Module):
+    def __init__(d_model: int, num_heads: int, d_forward: int, bucket_size: int, num_hashes: int, dropout: float=0.5):
+        super().__init__()
+        self.lsh_attention = LSHSelfAttention(d_model, num_heads, dropout) 
+ 
+        self.feed_forward = nn.Sequential(
+            nn.Linear(d_model, d_forward),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(d_forward, d_model)
+        )
+
+    def forward(self, src, src_mask=None):
+        src = self.lsh_attention(src, mask=src_mask)
+        src = self.feed_forward(src)
+        
+        # TODO: other norms and residual conns?
+        
+        return src
 class LSHModel(nn.Module):
-    def __init__(self, ntoken: int, d_model: int, nhead: int, d_forward: int, nlayers: int, dropout: float=0.5):
+    def __init__(self, ntoken: int, d_model: int, num_heads: int, d_forward: int, nlayers: int, dropout: float=0.5):
         super().__init__()
         self.model_type = 'Transformer'
         self.pos_encoder = PositionalEncoding(d_model, dropout)
         
         # TODO: custom LSH Encoder Layer
         self.encoder_layers = nn.ModuleList([
-            LSHEncoderLayer(nhead, d_model, d_forward, dropout)
+            LSHEncoderLayer(num_heads, d_model, d_forward, dropout)
             for _ in range(nlayers)
         ])
         self.transformer_encoder = TransformerEncoder(self.encoder_layers, nlayers)
