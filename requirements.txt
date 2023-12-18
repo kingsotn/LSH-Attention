@@ -1,0 +1,11 @@
+transformers
+datasets
+torch==2.1.1
+tqdm
+
+# evaluating
+evaluate
+nltk
+scikit-learn
+timeit
+matplotlib
